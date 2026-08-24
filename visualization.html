@@ -1,0 +1,495 @@
+<title>Agent Speed Race</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@600&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<style>
+:root {
+  --bg: #f7f4ed; --surface: #f1ede2; --rule: #d9d2c2;
+  --text: #1a1a1f; --text-sec: #6b6760; --text-muted: #a19c90;
+  --accent: #c2521d; --accent-fill: rgba(194,82,29,0.07);
+  --gh: #57606a; --gh-fill: rgba(87,96,106,0.06);
+  --font-display: "Familjen Grotesk", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15161a; --surface: #1c1d22; --rule: #2a2b30;
+    --text: #e8e6e1; --text-sec: #8a867d; --text-muted: #5a574f;
+    --accent: #e08147; --accent-fill: rgba(224,129,71,0.08);
+    --gh: #8b949e; --gh-fill: rgba(139,148,158,0.07);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15161a; --surface: #1c1d22; --rule: #2a2b30;
+  --text: #e8e6e1; --text-sec: #8a867d; --text-muted: #5a574f;
+  --accent: #e08147; --accent-fill: rgba(224,129,71,0.08);
+  --gh: #8b949e; --gh-fill: rgba(139,148,158,0.07);
+}
+body {
+  background: var(--bg); color: var(--text); font-family: var(--font-body);
+  line-height: 1.5; min-height: 100vh; display: flex; justify-content: center;
+  padding: 48px 16px 64px;
+}
+.ctr { max-width: 820px; width: 100%; }
+.hdr { text-align: center; margin-bottom: 24px; }
+.hdr h1 { font-family: var(--font-display); font-weight: 600; font-size: 26px; letter-spacing: -0.01em; line-height: 1.15; margin-bottom: 4px; }
+.hdr p { font-size: 14px; color: var(--text-sec); }
+
+.tabs { display: flex; gap: 4px; justify-content: center; margin-bottom: 14px; flex-wrap: wrap; }
+.tab {
+  font-family: var(--font-body); font-weight: 500; font-size: 13px;
+  padding: 6px 14px; background: var(--surface); color: var(--text-muted);
+  border: 1px solid transparent; border-radius: 6px; cursor: pointer; transition: all 0.15s;
+}
+.tab:hover { color: var(--text-sec); }
+.tab[aria-selected="true"] { color: var(--accent); border-color: var(--accent); background: var(--bg); }
+
+.ctrl { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 20px; }
+.go {
+  font-family: var(--font-body); font-weight: 500; font-size: 14px;
+  padding: 7px 22px; background: var(--accent); color: #fff;
+  border: none; border-radius: 6px; cursor: pointer; transition: opacity 0.15s;
+}
+.go:hover { opacity: 0.85; }
+.go[data-v="sec"] { background: transparent; color: var(--text-sec); border: 1px solid var(--rule); }
+.spd { display: flex; gap: 2px; background: var(--surface); border-radius: 6px; padding: 2px; }
+.sb {
+  font-family: var(--font-mono); font-weight: 500; font-size: 12.5px;
+  padding: 5px 10px; background: transparent; color: var(--text-muted);
+  border: none; border-radius: 4px; cursor: pointer; transition: color 0.15s, background 0.15s;
+}
+.sb[aria-pressed="true"] { background: var(--bg); color: var(--accent); }
+.sb:hover:not([aria-pressed="true"]) { color: var(--text-sec); }
+
+.lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+.lane {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 18px 14px 14px; display: flex; flex-direction: column; transition: border-color 0.4s ease;
+}
+.lane[data-done][data-p="cb"] { border-color: var(--accent); }
+.ln { font-family: var(--font-body); font-weight: 500; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; }
+.lane[data-p="cb"] .ln { color: var(--accent); }
+.lane[data-p="gh"] .ln { color: var(--gh); }
+.tm {
+  font-family: var(--font-mono); font-weight: 500; font-size: 40px; line-height: 1;
+  font-variant-numeric: tabular-nums; color: var(--text-muted); margin: 2px 0 14px; transition: color 0.3s;
+}
+.tm u { font-size: 18px; text-decoration: none; margin-left: 1px; }
+.lane[data-done][data-p="cb"] .tm { color: var(--accent); }
+.lane[data-done][data-p="gh"] .tm { color: var(--gh); }
+.ol {
+  flex: 1; min-height: 300px; max-height: 420px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 1px;
+  scrollbar-width: thin; scrollbar-color: var(--rule) transparent;
+}
+.op {
+  display: none; align-items: center; gap: 7px; padding: 3px 7px;
+  border-radius: 3px; font-size: 12px; min-height: 23px; animation: fin 0.12s ease-out;
+}
+.op[data-s="a"], .op[data-s="d"] { display: flex; }
+.op[data-s="a"] { background: var(--accent-fill); }
+.lane[data-p="gh"] .op[data-s="a"] { background: var(--gh-fill); }
+.op[data-s="d"] { color: var(--text-sec); }
+.dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.op[data-s="a"] .dot { animation: pulse 1s ease-in-out infinite; }
+.lane[data-p="cb"] .op[data-s="a"] .dot { background: var(--accent); }
+.lane[data-p="gh"] .op[data-s="a"] .dot { background: var(--gh); }
+.op[data-s="d"] .dot { background: var(--text-muted); }
+.opl { font-family: var(--font-mono); font-weight: 400; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.opt { font-family: var(--font-mono); font-weight: 500; font-size: 11px; color: var(--text-muted); flex-shrink: 0; min-width: 44px; text-align: right; }
+.ls { margin-top: 10px; font-size: 12px; font-weight: 500; color: var(--text-muted); min-height: 18px; display: flex; align-items: center; gap: 5px; }
+.ls .ck { font-weight: 600; }
+.lane[data-p="cb"] .ls .ck { color: var(--accent); }
+.lane[data-p="gh"] .ls .ck { color: var(--gh); }
+
+.sum {
+  background: var(--surface); border: 1px solid var(--rule); border-top: 2px solid var(--accent);
+  border-radius: 8px; padding: 24px 20px 20px; text-align: center;
+  opacity: 0; transform: translateY(10px); transition: opacity 0.4s ease, transform 0.4s ease; pointer-events: none;
+}
+.sum[data-v] { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.sh { font-family: var(--font-display); font-weight: 600; font-size: 42px; line-height: 1; color: var(--accent); margin-bottom: 3px; }
+.ss { font-size: 14px; color: var(--text-sec); margin-bottom: 14px; }
+.sb2 { display: flex; justify-content: center; gap: 16px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
+.sb2 strong { color: var(--text-sec); font-weight: 500; }
+.sn { margin-top: 12px; font-size: 11px; color: var(--text-muted); line-height: 1.6; }
+@keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+@keyframes fin { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 520px) {
+  body { padding: 24px 10px 48px; }
+  .hdr h1 { font-size: 21px; } .tm { font-size: 30px; } .tm u { font-size: 14px; }
+  .lane { padding: 14px 10px 10px; }
+  .op { font-size: 11px; gap: 5px; padding: 2px 5px; min-height: 20px; }
+  .opt { min-width: 36px; font-size: 10px; }
+  .ol { min-height: 240px; max-height: 360px; }
+  .lanes { gap: 6px; } .sh { font-size: 34px; }
+  .sb2 { flex-direction: column; gap: 3px; }
+  .ctrl { gap: 8px; } .sb { padding: 4px 7px; font-size: 11.5px; }
+  .go { padding: 6px 16px; font-size: 13px; }
+  .tab { font-size: 12px; padding: 5px 10px; }
+}
+</style>
+
+<div class="ctr">
+  <header class="hdr">
+    <h1>Same agent workflow. Two platforms.</h1>
+    <p>Four tasks, measured from Stockholm. Pick one and watch the race.</p>
+  </header>
+  <div class="tabs" id="tabs"></div>
+  <div class="ctrl">
+    <button class="go" id="go">Start</button>
+    <div class="spd">
+      <button class="sb" data-x="1">1x</button>
+      <button class="sb" data-x="5" aria-pressed="true">5x</button>
+      <button class="sb" data-x="20">20x</button>
+    </div>
+  </div>
+  <div class="lanes">
+    <div class="lane" data-p="cb">
+      <div class="ln">Codebahn</div>
+      <div class="tm" id="ct">0.0<u>s</u></div>
+      <div class="ol" id="co"></div>
+      <div class="ls" id="cs"></div>
+    </div>
+    <div class="lane" data-p="gh">
+      <div class="ln">GitHub</div>
+      <div class="tm" id="gt">0.0<u>s</u></div>
+      <div class="ol" id="go2"></div>
+      <div class="ls" id="gs"></div>
+    </div>
+  </div>
+  <div class="sum" id="sum" aria-live="polite">
+    <div class="sh" id="xh"></div>
+    <div class="ss" id="xs"></div>
+    <div class="sb2" id="xb"></div>
+    <div class="sn" id="xn"></div>
+  </div>
+</div>
+
+<script>
+const TASKS = {
+  "fix-email": {
+    label: "Fix email bug",
+    cb: [
+      { l: "List issues",             ms: 82  },
+      { l: "Browse repo structure",   ms: 58  },
+      { l: "Read issue #1",           ms: 58  },
+      { l: "Read issue comments",     ms: 40  },
+      { l: "Read src/validate.ts",    ms: 77  },
+      { l: "Read src/types.ts",       ms: 51  },
+      { l: "Create branch",           ms: 485 },
+      { l: "Read src/index.ts",       ms: 65  },
+      { l: "Read src/config.ts",      ms: 89  },
+      { l: "Update src/validate.ts",  ms: 578 },
+      { l: "Update test file",        ms: 475 },
+      { l: "Create pull request",     ms: 252 },
+    ],
+    gh: [
+      { l: "List issues",             ms: 1302 },
+      { l: "Check user info",         ms: 1122 },
+      { l: "Search repos",            ms: 2149 },
+      { l: "List issues (retry)",     ms: 1303 },
+      { l: "Read issue #1",           ms: 1126 },
+      { l: "Read issue comments",     ms: 1557 },
+      { l: "Browse repo structure",   ms: 2386 },
+      { l: "Read src/validate.ts",    ms: 1269 },
+      { l: "Read src/types.ts",       ms: 1194 },
+      { l: "Read src/format.ts",      ms: 2222 },
+      { l: "Read src/index.ts",       ms: 8070 },
+      { l: "Create branch",           ms: 1170 },
+      { l: "Read src/config.ts",      ms: 7744 },
+      { l: "List PRs",                ms: 1190 },
+      { l: "Read PR details",         ms: 1142 },
+    ],
+  },
+  "fix-currency": {
+    label: "Fix currency bug",
+    cb: [
+      { l: "List issues",             ms: 78  },
+      { l: "Browse repo structure",   ms: 90  },
+      { l: "Read issue #2",           ms: 65  },
+      { l: "Read issue comments",     ms: 46  },
+      { l: "Read src/format.ts",      ms: 69  },
+      { l: "Read src/types.ts",       ms: 61  },
+      { l: "Read src/config.ts",      ms: 83  },
+      { l: "Read src/index.ts",       ms: 77  },
+      { l: "Read test/validate.test", ms: 74  },
+      { l: "Read src/validate.ts",    ms: 86  },
+      { l: "Create branch",           ms: 475 },
+      { l: "Update src/format.ts",    ms: 553 },
+      { l: "Create test/format.test", ms: 491 },
+      { l: "Create pull request",     ms: 270 },
+    ],
+    gh: [
+      { l: "List issues",             ms: 1167 },
+      { l: "Browse repo structure",   ms: 1352 },
+      { l: "Check user info",         ms: 1155 },
+      { l: "Search repos",            ms: 2282 },
+      { l: "List issues (retry)",     ms: 1197 },
+      { l: "Browse repo (retry)",     ms: 2331 },
+      { l: "Read issue comments",     ms: 1183 },
+      { l: "Read src/format.ts",      ms: 1608 },
+      { l: "Read src/types.ts",       ms: 2002 },
+      { l: "Read src/config.ts",      ms: 2724 },
+      { l: "Read issue #2",           ms: 1112 },
+      { l: "Read src/index.ts",       ms: 1556 },
+      { l: "Create branch",           ms: 1112 },
+      { l: "Read src/validate.ts",    ms: 1902 },
+      { l: "Update src/format.ts",    ms: 1191 },
+      { l: "Create test/format.test", ms: 1241 },
+      { l: "Read test file",          ms: 1154 },
+      { l: "Read src/format.ts",      ms: 1873 },
+      { l: "Create pull request",     ms: 1143 },
+      { l: "List PRs",                ms: 1334 },
+    ],
+  },
+  "review-pr": {
+    label: "Review PR",
+    cb: [
+      { l: "List pull requests",      ms: 95  },
+      { l: "Read PR details",         ms: 64  },
+      { l: "Read PR diff",            ms: 44  },
+      { l: "List PR files",           ms: 102 },
+      { l: "Read issue #1",           ms: 63  },
+      { l: "Read src/validate.ts",    ms: 53  },
+      { l: "Submit review",           ms: 64  },
+      { l: "Submit review",           ms: 196 },
+    ],
+    gh: [
+      { l: "List pull requests",      ms: 1142 },
+      { l: "Check user info",         ms: 1113 },
+      { l: "List PRs (retry)",        ms: 1115 },
+      { l: "Search repos",            ms: 1115 },
+      { l: "List PRs (retry)",        ms: 1169 },
+      { l: "Read PR details",         ms: 1257 },
+      { l: "Read PR diff",            ms: 1685 },
+      { l: "List PR files",           ms: 2793 },
+      { l: "Read issue #1",           ms: 1182 },
+      { l: "Read src/validate.ts",    ms: 1962 },
+      { l: "Submit review",           ms: 1614 },
+      { l: "Submit review",           ms: 1211 },
+    ],
+  },
+  "explore": {
+    label: "Explore codebase",
+    cb: [
+      { l: "Browse repo structure",   ms: 66  },
+      { l: "List issues",             ms: 65  },
+      { l: "List pull requests",      ms: 123 },
+      { l: "Read src/validate.ts",    ms: 70  },
+      { l: "Read src/types.ts",       ms: 71  },
+      { l: "Read src/format.ts",      ms: 63  },
+      { l: "Read src/config.ts",      ms: 57  },
+      { l: "Read src/index.ts",       ms: 69  },
+      { l: "Read test/validate.test", ms: 77  },
+      { l: "Read issue #1",           ms: 56  },
+      { l: "Read issue #2",           ms: 65  },
+      { l: "Read issue #3",           ms: 56  },
+      { l: "Read issue comments #1",  ms: 46  },
+      { l: "Read issue comments #2",  ms: 45  },
+      { l: "Read issue comments #3",  ms: 49  },
+      { l: "Read PR #4",              ms: 117 },
+      { l: "Read PR #5",              ms: 74  },
+      { l: "Read PR #4 comments",     ms: 45  },
+      { l: "Read PR #5 comments",     ms: 41  },
+    ],
+    gh: [
+      { l: "Browse repo structure",   ms: 1116 },
+      { l: "List issues",             ms: 1698 },
+      { l: "List pull requests",      ms: 2787 },
+      { l: "Check user info",         ms: 1401 },
+      { l: "Search repos",            ms: 2383 },
+      { l: "Browse repo (retry)",     ms: 1160 },
+      { l: "List issues (retry)",     ms: 1158 },
+      { l: "List PRs (retry)",        ms: 2312 },
+      { l: "Read src/validate.ts",    ms: 1178 },
+      { l: "Read src/types.ts",       ms: 1637 },
+      { l: "Read src/format.ts",      ms: 2110 },
+      { l: "Read src/config.ts",      ms: 1855 },
+      { l: "Read src/index.ts",       ms: 2302 },
+      { l: "Read test/validate.test", ms: 2790 },
+      { l: "Read issue #1",           ms: 3332 },
+      { l: "Read issue #2",           ms: 3838 },
+      { l: "Read issue #3",           ms: 4300 },
+      { l: "Read issue comments #1",  ms: 4726 },
+      { l: "Read issue comments #2",  ms: 5060 },
+      { l: "Read issue comments #3",  ms: 5562 },
+      { l: "Read PR #4",              ms: 5977 },
+      { l: "Read PR #5",              ms: 7130 },
+    ],
+  },
+};
+
+const TASK_KEYS = Object.keys(TASKS);
+
+function fms(ms) {
+  return ms < 1000 ? Math.round(ms) + "ms" : (ms / 1000).toFixed(1) + "s";
+}
+
+const $ = id => document.getElementById(id);
+const goBtn = $("go");
+const cbT = $("ct"), ghT = $("gt");
+const cbO = $("co"), ghO = $("go2");
+const cbS = $("cs"), ghS = $("gs");
+const sumEl = $("sum");
+const cbL = document.querySelector('[data-p="cb"]');
+const ghL = document.querySelector('[data-p="gh"]');
+const tabsEl = $("tabs");
+
+let currentTask = TASK_KEYS[0];
+let cbR = [], ghR = [];
+let speed = 5, running = false, raf = null, lt = null;
+const S = () => ({ i: 0, e: 0, t: 0, done: false });
+let cb, gh;
+
+function mkRows(el, ops) {
+  el.innerHTML = "";
+  return ops.map(o => {
+    const r = document.createElement("div");
+    r.className = "op"; r.dataset.s = "p";
+    r.innerHTML = '<span class="dot"></span><span class="opl"></span><span class="opt"></span>';
+    r.querySelector(".opl").textContent = o.l;
+    el.appendChild(r);
+    return r;
+  });
+}
+
+function buildTabs() {
+  tabsEl.innerHTML = "";
+  for (const key of TASK_KEYS) {
+    const btn = document.createElement("button");
+    btn.className = "tab";
+    btn.textContent = TASKS[key].label;
+    btn.setAttribute("aria-selected", key === currentTask ? "true" : "false");
+    btn.addEventListener("click", () => selectTask(key));
+    tabsEl.appendChild(btn);
+  }
+}
+
+function selectTask(key) {
+  if (running) cancelAnimationFrame(raf);
+  running = false;
+  currentTask = key;
+  tabsEl.querySelectorAll(".tab").forEach((t, i) =>
+    t.setAttribute("aria-selected", TASK_KEYS[i] === key ? "true" : "false")
+  );
+  const task = TASKS[key];
+  cbR = mkRows(cbO, task.cb);
+  ghR = mkRows(ghO, task.gh);
+  goBtn.textContent = "Start";
+  goBtn.removeAttribute("data-v");
+  reset();
+}
+
+function reset() {
+  cb = S(); gh = S(); lt = null;
+  cbT.innerHTML = '0.0<u>s</u>';
+  ghT.innerHTML = '0.0<u>s</u>';
+  cbL.removeAttribute("data-done");
+  ghL.removeAttribute("data-done");
+  cbS.innerHTML = ""; ghS.innerHTML = "";
+  sumEl.removeAttribute("data-v");
+  cbR.forEach(r => { r.dataset.s = "p"; r.querySelector(".opt").textContent = ""; });
+  ghR.forEach(r => { r.dataset.s = "p"; r.querySelector(".opt").textContent = ""; });
+  cbO.scrollTop = 0; ghO.scrollTop = 0;
+}
+
+function adv(s, ops, d) {
+  if (s.done) return;
+  let rem = d;
+  while (rem > 0 && !s.done) {
+    const dur = ops[s.i].ms;
+    const left = dur - s.e;
+    if (rem >= left) { rem -= left; s.t += dur; s.e = 0; s.i++; if (s.i >= ops.length) s.done = true; }
+    else { s.e += rem; rem = 0; }
+  }
+}
+
+function rl(s, ops, rows, tel, sel, lane) {
+  const dt = s.t + (s.done ? 0 : s.e);
+  tel.innerHTML = (dt / 1000).toFixed(1) + '<u>s</u>';
+  for (let i = 0; i < s.i && i < rows.length; i++) {
+    if (rows[i].dataset.s !== "d") {
+      rows[i].dataset.s = "d";
+      rows[i].querySelector(".opt").textContent = fms(ops[i].ms);
+    }
+  }
+  if (!s.done && s.i < rows.length) {
+    const r = rows[s.i];
+    if (r.dataset.s !== "a") { r.dataset.s = "a"; r.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
+    if (s.e > 300) r.querySelector(".opt").textContent = fms(s.e);
+  }
+  if (s.done && !lane.hasAttribute("data-done")) {
+    lane.dataset.done = "";
+    sel.innerHTML = '<span class="ck">&#10003;</span> Complete';
+  }
+}
+
+function summary() {
+  const task = TASKS[currentTask];
+  const cbTotal = task.cb.reduce((s, o) => s + o.ms, 0);
+  const ghTotal = task.gh.reduce((s, o) => s + o.ms, 0);
+  const ratio = (ghTotal / cbTotal).toFixed(1);
+  const saved = ((ghTotal - cbTotal) / 1000).toFixed(1);
+
+  $("xh").textContent = ratio + "× faster";
+  $("xs").textContent = saved + "s saved. " + task.cb.length + " calls (CB) vs " + task.gh.length + " (GH).";
+
+  const allCb = TASK_KEYS.reduce((s, k) => s + TASKS[k].cb.reduce((a, o) => a + o.ms, 0), 0);
+  const allGh = TASK_KEYS.reduce((s, k) => s + TASKS[k].gh.reduce((a, o) => a + o.ms, 0), 0);
+  const allRatio = (allGh / allCb).toFixed(1);
+  const allSaved = ((allGh - allCb) / 1000).toFixed(1);
+
+  $("xb").innerHTML = TASK_KEYS.map(k => {
+    const c = TASKS[k].cb.reduce((s, o) => s + o.ms, 0);
+    const g = TASKS[k].gh.reduce((s, o) => s + o.ms, 0);
+    const bold = k === currentTask ? "color:var(--text)" : "";
+    return '<span style="' + bold + '">' + TASKS[k].label + ' <strong>' + (g/c).toFixed(1) + '×</strong></span>';
+  }).join("");
+
+  $("xn").textContent = "Across all 4 tasks: " + allRatio + "× faster, " + allSaved + "s saved. Measured from Stockholm.";
+
+  requestAnimationFrame(() => { sumEl.dataset.v = ""; });
+}
+
+function tick(ts) {
+  if (!lt) lt = ts;
+  const rd = Math.min(ts - lt, 100);
+  lt = ts;
+  const sd = rd * speed;
+  const task = TASKS[currentTask];
+  adv(cb, task.cb, sd);
+  adv(gh, task.gh, sd);
+  rl(cb, task.cb, cbR, cbT, cbS, cbL);
+  rl(gh, task.gh, ghR, ghT, ghS, ghL);
+  if (cb.done && gh.done) {
+    running = false;
+    goBtn.textContent = "Run again";
+    goBtn.removeAttribute("data-v");
+    summary();
+    return;
+  }
+  raf = requestAnimationFrame(tick);
+}
+
+function start() {
+  if (running) cancelAnimationFrame(raf);
+  reset();
+  running = true;
+  goBtn.textContent = "Restart";
+  goBtn.dataset.v = "sec";
+  raf = requestAnimationFrame(tick);
+}
+
+goBtn.addEventListener("click", start);
+document.querySelectorAll(".sb").forEach(b => {
+  b.addEventListener("click", () => {
+    speed = +b.dataset.x;
+    document.querySelectorAll(".sb").forEach(x => x.setAttribute("aria-pressed", "false"));
+    b.setAttribute("aria-pressed", "true");
+  });
+});
+
+buildTabs();
+selectTask(TASK_KEYS[0]);
+</script>
