@@ -1,0 +1,17 @@
+{
+  "name": "codebahn-bench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Benchmark Codebahn vs GitHub with real agent workflows",
+  "scripts": {
+    "parse": "tsx src/parse.ts",
+    "compare": "tsx src/compare.ts",
+    "summary": "tsx src/summary.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "codebahn": {
+      "type": "http",
+      "url": "https://codebahn.net/mcp"
+    }
+  }
+}
