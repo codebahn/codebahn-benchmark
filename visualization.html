@@ -1,5 +1,5 @@
 <title>Agent Speed Race</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@600&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@600;700&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap">
 
 <style>
 :root {
@@ -35,14 +35,23 @@ body {
 .hdr h1 { font-family: var(--font-display); font-weight: 600; font-size: 26px; letter-spacing: -0.01em; line-height: 1.15; margin-bottom: 4px; }
 .hdr p { font-size: 14px; color: var(--text-sec); }
 
-.tabs { display: flex; gap: 4px; justify-content: center; margin-bottom: 14px; flex-wrap: wrap; }
-.tab {
+.view-tabs { display: flex; gap: 4px; justify-content: center; margin-bottom: 14px; }
+.view-tab {
   font-family: var(--font-body); font-weight: 500; font-size: 13px;
   padding: 6px 14px; background: var(--surface); color: var(--text-muted);
   border: 1px solid transparent; border-radius: 6px; cursor: pointer; transition: all 0.15s;
 }
+.view-tab:hover { color: var(--text-sec); }
+.view-tab[aria-selected="true"] { color: var(--accent); border-color: var(--accent); background: var(--bg); }
+
+.tabs { display: flex; gap: 4px; justify-content: center; margin-bottom: 14px; flex-wrap: wrap; }
+.tab {
+  font-family: var(--font-body); font-weight: 500; font-size: 12px;
+  padding: 5px 12px; background: var(--surface); color: var(--text-muted);
+  border: 1px solid transparent; border-radius: 5px; cursor: pointer; transition: all 0.15s;
+}
 .tab:hover { color: var(--text-sec); }
-.tab[aria-selected="true"] { color: var(--accent); border-color: var(--accent); background: var(--bg); }
+.tab[aria-selected="true"] { color: var(--accent); border-color: var(--rule); background: var(--bg); }
 
 .ctrl { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 20px; }
 .go {
@@ -78,7 +87,7 @@ body {
 .lane[data-done][data-p="cb"] .tm { color: var(--accent); }
 .lane[data-done][data-p="gh"] .tm { color: var(--gh); }
 .ol {
-  flex: 1; min-height: 300px; max-height: 420px; overflow-y: auto;
+  flex: 1; min-height: 260px; max-height: 420px; overflow-y: auto;
   display: flex; flex-direction: column; gap: 1px;
   scrollbar-width: thin; scrollbar-color: var(--rule) transparent;
 }
@@ -121,20 +130,24 @@ body {
   .lane { padding: 14px 10px 10px; }
   .op { font-size: 11px; gap: 5px; padding: 2px 5px; min-height: 20px; }
   .opt { min-width: 36px; font-size: 10px; }
-  .ol { min-height: 240px; max-height: 360px; }
+  .ol { min-height: 200px; max-height: 360px; }
   .lanes { gap: 6px; } .sh { font-size: 34px; }
   .sb2 { flex-direction: column; gap: 3px; }
   .ctrl { gap: 8px; } .sb { padding: 4px 7px; font-size: 11.5px; }
   .go { padding: 6px 16px; font-size: 13px; }
-  .tab { font-size: 12px; padding: 5px 10px; }
+  .tab { font-size: 11px; padding: 4px 8px; }
 }
 </style>
 
 <div class="ctr">
   <header class="hdr">
-    <h1>Same agent workflow. Two platforms.</h1>
-    <p>Four tasks, measured from Stockholm. Pick one and watch the race.</p>
+    <h1>How fast is your Git host?</h1>
+    <p>Real measurements from Gothenburg, Sweden. Pick a view and watch the race.</p>
   </header>
+  <div class="view-tabs" id="views">
+    <button class="view-tab" data-view="api" aria-selected="true">API latency</button>
+    <button class="view-tab" data-view="agent" aria-selected="false">Agent workflows</button>
+  </div>
   <div class="tabs" id="tabs"></div>
   <div class="ctrl">
     <button class="go" id="go">Start</button>
@@ -167,7 +180,34 @@ body {
 </div>
 
 <script>
-const TASKS = {
+// ── API benchmark data (curl, p50 over 50 iterations) ────────
+
+const API = {
+  label: "API latency (p50)",
+  note: "curl timing, 50 iterations per endpoint, p50 values. Gothenburg, Sweden.",
+  cb: [
+    { l: "List pull requests",   ms: 76  },
+    { l: "List repo contents",   ms: 85  },
+    { l: "Get issue #1",         ms: 100 },
+    { l: "Get file content",     ms: 116 },
+    { l: "List issues",          ms: 123 },
+    { l: "List branches",        ms: 139 },
+    { l: "List commits",         ms: 206 },
+  ],
+  gh: [
+    { l: "Get file content",     ms: 264 },
+    { l: "List repo contents",   ms: 262 },
+    { l: "List branches",        ms: 310 },
+    { l: "List pull requests",   ms: 319 },
+    { l: "Get issue #1",         ms: 344 },
+    { l: "List commits",         ms: 359 },
+    { l: "List issues",          ms: 405 },
+  ],
+};
+
+// ── Agent benchmark data (MCP transcripts) ────────────────────
+
+const AGENT_TASKS = {
   "fix-email": {
     label: "Fix email bug",
     cb: [
@@ -320,7 +360,7 @@ const TASKS = {
   },
 };
 
-const TASK_KEYS = Object.keys(TASKS);
+// ── Engine ────────────────────────────────────────────────────
 
 function fms(ms) {
   return ms < 1000 ? Math.round(ms) + "ms" : (ms / 1000).toFixed(1) + "s";
@@ -335,8 +375,11 @@ const sumEl = $("sum");
 const cbL = document.querySelector('[data-p="cb"]');
 const ghL = document.querySelector('[data-p="gh"]');
 const tabsEl = $("tabs");
+const viewsEl = $("views");
 
-let currentTask = TASK_KEYS[0];
+let currentView = "api";
+let currentTask = null;
+let activeCb = [], activeGh = [], activeNote = "";
 let cbR = [], ghR = [];
 let speed = 5, running = false, raf = null, lt = null;
 const S = () => ({ i: 0, e: 0, t: 0, done: false });
@@ -356,14 +399,49 @@ function mkRows(el, ops) {
 
 function buildTabs() {
   tabsEl.innerHTML = "";
-  for (const key of TASK_KEYS) {
+  if (currentView === "api") {
+    tabsEl.style.display = "none";
+    return;
+  }
+  tabsEl.style.display = "flex";
+  for (const key of Object.keys(AGENT_TASKS)) {
     const btn = document.createElement("button");
     btn.className = "tab";
-    btn.textContent = TASKS[key].label;
+    btn.textContent = AGENT_TASKS[key].label;
     btn.setAttribute("aria-selected", key === currentTask ? "true" : "false");
     btn.addEventListener("click", () => selectTask(key));
     tabsEl.appendChild(btn);
   }
+}
+
+function loadData() {
+  if (currentView === "api") {
+    activeCb = API.cb;
+    activeGh = API.gh;
+    activeNote = API.note;
+  } else {
+    const task = AGENT_TASKS[currentTask];
+    activeCb = task.cb;
+    activeGh = task.gh;
+    activeNote = "Agent MCP calls, single run. Gothenburg, Sweden.";
+  }
+  cbR = mkRows(cbO, activeCb);
+  ghR = mkRows(ghO, activeGh);
+}
+
+function selectView(view) {
+  if (running) cancelAnimationFrame(raf);
+  running = false;
+  currentView = view;
+  if (view === "agent" && !currentTask) currentTask = Object.keys(AGENT_TASKS)[0];
+  viewsEl.querySelectorAll(".view-tab").forEach(t =>
+    t.setAttribute("aria-selected", t.dataset.view === view ? "true" : "false")
+  );
+  buildTabs();
+  loadData();
+  goBtn.textContent = "Start";
+  goBtn.removeAttribute("data-v");
+  reset();
 }
 
 function selectTask(key) {
@@ -371,11 +449,9 @@ function selectTask(key) {
   running = false;
   currentTask = key;
   tabsEl.querySelectorAll(".tab").forEach((t, i) =>
-    t.setAttribute("aria-selected", TASK_KEYS[i] === key ? "true" : "false")
+    t.setAttribute("aria-selected", Object.keys(AGENT_TASKS)[i] === key ? "true" : "false")
   );
-  const task = TASKS[key];
-  cbR = mkRows(cbO, task.cb);
-  ghR = mkRows(ghO, task.gh);
+  loadData();
   goBtn.textContent = "Start";
   goBtn.removeAttribute("data-v");
   reset();
@@ -383,10 +459,8 @@ function selectTask(key) {
 
 function reset() {
   cb = S(); gh = S(); lt = null;
-  cbT.innerHTML = '0.0<u>s</u>';
-  ghT.innerHTML = '0.0<u>s</u>';
-  cbL.removeAttribute("data-done");
-  ghL.removeAttribute("data-done");
+  cbT.innerHTML = '0.0<u>s</u>'; ghT.innerHTML = '0.0<u>s</u>';
+  cbL.removeAttribute("data-done"); ghL.removeAttribute("data-done");
   cbS.innerHTML = ""; ghS.innerHTML = "";
   sumEl.removeAttribute("data-v");
   cbR.forEach(r => { r.dataset.s = "p"; r.querySelector(".opt").textContent = ""; });
@@ -417,7 +491,7 @@ function rl(s, ops, rows, tel, sel, lane) {
   if (!s.done && s.i < rows.length) {
     const r = rows[s.i];
     if (r.dataset.s !== "a") { r.dataset.s = "a"; r.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
-    if (s.e > 300) r.querySelector(".opt").textContent = fms(s.e);
+    if (s.e > 200) r.querySelector(".opt").textContent = fms(s.e);
   }
   if (s.done && !lane.hasAttribute("data-done")) {
     lane.dataset.done = "";
@@ -426,29 +500,32 @@ function rl(s, ops, rows, tel, sel, lane) {
 }
 
 function summary() {
-  const task = TASKS[currentTask];
-  const cbTotal = task.cb.reduce((s, o) => s + o.ms, 0);
-  const ghTotal = task.gh.reduce((s, o) => s + o.ms, 0);
+  const cbTotal = activeCb.reduce((s, o) => s + o.ms, 0);
+  const ghTotal = activeGh.reduce((s, o) => s + o.ms, 0);
   const ratio = (ghTotal / cbTotal).toFixed(1);
   const saved = ((ghTotal - cbTotal) / 1000).toFixed(1);
+  const cbAvg = Math.round(cbTotal / activeCb.length);
+  const ghAvg = Math.round(ghTotal / activeGh.length);
 
   $("xh").textContent = ratio + "× faster";
-  $("xs").textContent = saved + "s saved. " + task.cb.length + " calls (CB) vs " + task.gh.length + " (GH).";
+  $("xs").textContent = cbAvg + "ms avg per call (Codebahn) vs " + ghAvg + "ms (GitHub)";
 
-  const allCb = TASK_KEYS.reduce((s, k) => s + TASKS[k].cb.reduce((a, o) => a + o.ms, 0), 0);
-  const allGh = TASK_KEYS.reduce((s, k) => s + TASKS[k].gh.reduce((a, o) => a + o.ms, 0), 0);
-  const allRatio = (allGh / allCb).toFixed(1);
-  const allSaved = ((allGh - allCb) / 1000).toFixed(1);
+  if (currentView === "api") {
+    $("xb").innerHTML =
+      "<span>p50 <strong>" + Math.round(cbTotal / activeCb.length) + "ms</strong> vs <strong>" + Math.round(ghTotal / activeGh.length) + "ms</strong></span>" +
+      "<span>Total <strong>" + fms(cbTotal) + "</strong> vs <strong>" + fms(ghTotal) + "</strong></span>" +
+      "<span>350 calls measured</span>";
+  } else {
+    const keys = Object.keys(AGENT_TASKS);
+    $("xb").innerHTML = keys.map(k => {
+      const c = AGENT_TASKS[k].cb.reduce((s, o) => s + o.ms, 0);
+      const g = AGENT_TASKS[k].gh.reduce((s, o) => s + o.ms, 0);
+      const bold = k === currentTask ? "color:var(--text)" : "";
+      return '<span style="' + bold + '">' + AGENT_TASKS[k].label + ' <strong>' + (g/c).toFixed(1) + '×</strong></span>';
+    }).join("");
+  }
 
-  $("xb").innerHTML = TASK_KEYS.map(k => {
-    const c = TASKS[k].cb.reduce((s, o) => s + o.ms, 0);
-    const g = TASKS[k].gh.reduce((s, o) => s + o.ms, 0);
-    const bold = k === currentTask ? "color:var(--text)" : "";
-    return '<span style="' + bold + '">' + TASKS[k].label + ' <strong>' + (g/c).toFixed(1) + '×</strong></span>';
-  }).join("");
-
-  $("xn").textContent = "Across all 4 tasks: " + allRatio + "× faster, " + allSaved + "s saved. Measured from Stockholm.";
-
+  $("xn").textContent = activeNote;
   requestAnimationFrame(() => { sumEl.dataset.v = ""; });
 }
 
@@ -457,11 +534,10 @@ function tick(ts) {
   const rd = Math.min(ts - lt, 100);
   lt = ts;
   const sd = rd * speed;
-  const task = TASKS[currentTask];
-  adv(cb, task.cb, sd);
-  adv(gh, task.gh, sd);
-  rl(cb, task.cb, cbR, cbT, cbS, cbL);
-  rl(gh, task.gh, ghR, ghT, ghS, ghL);
+  adv(cb, activeCb, sd);
+  adv(gh, activeGh, sd);
+  rl(cb, activeCb, cbR, cbT, cbS, cbL);
+  rl(gh, activeGh, ghR, ghT, ghS, ghL);
   if (cb.done && gh.done) {
     running = false;
     goBtn.textContent = "Run again";
@@ -489,7 +565,9 @@ document.querySelectorAll(".sb").forEach(b => {
     b.setAttribute("aria-pressed", "true");
   });
 });
+viewsEl.querySelectorAll(".view-tab").forEach(t => {
+  t.addEventListener("click", () => selectView(t.dataset.view));
+});
 
-buildTabs();
-selectTask(TASK_KEYS[0]);
+selectView("api");
 </script>
