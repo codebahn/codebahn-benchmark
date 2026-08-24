@@ -2,3 +2,4 @@ node_modules/
 agent/results/
 agent/mcp-codebahn.json
 agent/mcp-github.json
+api-results/
