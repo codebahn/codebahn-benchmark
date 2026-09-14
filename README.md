@@ -78,6 +78,38 @@ The token is read from the environment rather than argv so it stays out of `ps`.
 
 Byte counts are exact. Token figures in the output are bytes/4 estimates: exact counts only exist for an agent run, where they come from the API's usage field.
 
+## Review benchmark (the two arms)
+
+Measures what the review tools added in `codebahn-forgejo#240` are worth to a real
+review: context carried, wall clock, and how many planted defects the agent finds.
+
+Both arms run against the same live binary. The `before` arm hides
+`compare_refs`, `list_pr_commits` and `get_commit_diff` with `--disallowedTools`,
+so the agent has to work from the squashed diff the way it used to.
+
+```bash
+CODEBAHN_TOKEN=... pnpm fixture          # plant the defects, open the PR
+./agent/run.sh codebahn hackerman data-utils review-defects --arm before
+./agent/run.sh codebahn hackerman data-utils review-defects --arm after
+pnpm score agent/results/review-defects-codebahn-before-*/stream.jsonl
+pnpm score agent/results/review-defects-codebahn-after-*/stream.jsonl
+pnpm compare agent/results/review-defects-codebahn-after-*/*-parsed.json \
+             agent/results/review-defects-codebahn-before-*/*-parsed.json
+```
+
+`pnpm fixture` needs a token with `write:repository`; everything else needs only
+read scope. `--dry-run` prints the plan without touching the repo.
+
+Four defects are planted, listed in `src/defects.ts`. Two survive into the
+squashed diff, so either arm can find them and they act as the control. Two exist
+only between commits: a credential added in the first commit and removed in the
+last, and an intermediate commit that does not compile. A reviewer working from
+the squashed diff cannot see either, so history recall is the number the review
+tools are supposed to move.
+
+Cost matters here: each arm is a real agent run. Start with one run per arm, and
+only repeat for error bars once the numbers look worth it.
+
 ## Development
 
 ```bash
