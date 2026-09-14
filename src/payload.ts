@@ -47,6 +47,13 @@ const mcp = (tool: string, toolArgs: Record<string, unknown>): Request => ({
 interface Probe {
   label: string;
   note: string;
+  /**
+   * "endToEnd" probes are whole operations an agent performs, so their payloads
+   * can be added up. "isolation" probes turn one server-side knob and share
+   * their before payload with an end-to-end probe; totalling those would count
+   * the same bytes twice.
+   */
+  kind: "endToEnd" | "isolation";
   before: Request;
   after: Request;
 }
@@ -57,42 +64,49 @@ const compareRange = `${repoPath}/compare/${BASE}...${HEAD}`;
 const probes: Probe[] = [
   {
     label: "compare: per-commit files",
+    kind: "isolation",
     note: "commit_files=true vs false, the git call per commit",
     before: rest(`${compareRange}?stat=false&verification=false&commit_files=true`),
     after: rest(`${compareRange}?stat=false&verification=false&commit_files=false`),
   },
   {
     label: "compare: top-level file list",
+    kind: "isolation",
     note: "files=true vs false, the extra base...head diff",
     before: rest(`${compareRange}?stat=false&verification=false&commit_files=false&files=true`),
     after: rest(`${compareRange}?stat=false&verification=false&commit_files=false&files=false`),
   },
   {
     label: "list commits: server work",
+    kind: "isolation",
     note: "defaults vs stat/verification/files off",
     before: rest(`${repoPath}/commits?limit=50`),
     after: rest(`${repoPath}/commits?limit=50&stat=false&verification=false&files=false`),
   },
   {
     label: "list commits: end to end",
+    kind: "endToEnd",
     note: "raw REST vs the slim tool an agent actually sees",
     before: rest(`${repoPath}/commits?limit=50`),
     after: mcp("list_repo_commits", { owner: OWNER, repo: REPO, page: 1, limit: 50 }),
   },
   {
     label: "PR files: end to end",
+    kind: "endToEnd",
     note: "raw REST vs the tool, which drops the three URL fields",
     before: rest(`${repoPath}/pulls/${PR}/files?limit=50`),
     after: mcp("list_pull_request_files", { owner: OWNER, repo: REPO, index: PR, limit: 50 }),
   },
   {
     label: "PR commits: end to end",
+    kind: "endToEnd",
     note: "raw REST vs the tool",
     before: rest(`${repoPath}/pulls/${PR}/commits?limit=50`),
     after: mcp("list_pr_commits", { owner: OWNER, repo: REPO, index: PR, limit: 50 }),
   },
   {
     label: "compare: end to end",
+    kind: "endToEnd",
     note: "raw REST vs compare_refs",
     before: rest(compareRange),
     after: mcp("compare_refs", { owner: OWNER, repo: REPO, base: BASE, head: HEAD }),
@@ -236,6 +250,7 @@ async function main(): Promise<void> {
     results.push({
       label: probe.label,
       note: probe.note,
+      kind: probe.kind,
       before: { ...before, tokens: estimateTokens(before.bytes) },
       after: { ...after, tokens: estimateTokens(after.bytes) },
       bytesRatio: after.bytes > 0 ? before.bytes / after.bytes : null,
@@ -245,11 +260,15 @@ async function main(): Promise<void> {
     );
   }
 
-  const totalBefore = results.reduce((sum, r) => sum + r.before.bytes, 0);
-  const totalAfter = results.reduce((sum, r) => sum + r.after.bytes, 0);
+  // Only the end-to-end probes are distinct operations. The isolation probes
+  // reuse their before payload, so adding everything up counts the same bytes
+  // more than once.
+  const endToEnd = results.filter((r) => r.kind === "endToEnd");
+  const totalBefore = endToEnd.reduce((sum, r) => sum + r.before.bytes, 0);
+  const totalAfter = endToEnd.reduce((sum, r) => sum + r.after.bytes, 0);
   console.log("─".repeat(76));
   console.log(
-    `  One pass over every probe: ${kb(totalBefore)} -> ${kb(totalAfter)} (${ratio(totalBefore, totalAfter)} smaller, ` +
+    `  One review pass, each operation once: ${kb(totalBefore)} -> ${kb(totalAfter)} (${ratio(totalBefore, totalAfter)} smaller, ` +
       `~${estimateTokens(totalBefore - totalAfter).toLocaleString()} tokens saved)`,
   );
   console.log("  Token figures are bytes/4 estimates; exact counts come from an agent run.");
