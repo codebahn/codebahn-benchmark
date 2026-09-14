@@ -58,7 +58,35 @@ pnpm compare agent/results/codebahn-*/*-parsed.json \
              agent/results/github-*/*-parsed.json
 ```
 
-The parser separates platform wait time (MCP call duration) from model thinking time. The comparison reports per-tool latency and total platform wait.
+The parser separates platform wait time (MCP call duration) from model thinking time, and counts tokens: peak context, input (split by cache), output, and the run cost. The comparison reports per-tool latency, total platform wait, and context cost.
+
+Latency tells you how long a workflow waited. Tokens tell you what it cost to carry the results, which is the number that moves when tool responses get slimmer.
+
+## Payload benchmark
+
+`pnpm payload` measures how many bytes a review operation costs an agent, before and after the MCP response work, against one live instance. No agent, no LLM, no second deployment.
+
+The "before" side is still reachable on the current binary: the raw REST API returns the full objects the MCP layer now slims, and the compare endpoint still takes the query parameters the tools used to leave at their defaults.
+
+```bash
+pnpm payload --dry-run              # print the requests without sending them
+CODEBAHN_TOKEN=... pnpm payload     # median of 5 iterations per side
+CODEBAHN_TOKEN=... pnpm payload --iterations 20
+```
+
+The token is read from the environment rather than argv so it stays out of `ps`. Targets default to a pinned range on `codebahn/codebahn-forgejo` (64 commits, 427 files) so runs stay comparable; override with `CB_HOST`, `CB_OWNER`, `CB_REPO`, `CB_PR`, `CB_BASE` and `CB_HEAD`.
+
+Byte counts are exact. Token figures in the output are bytes/4 estimates: exact counts only exist for an agent run, where they come from the API's usage field.
+
+## Development
+
+```bash
+pnpm test     # vitest, src/ only
+pnpm lint     # biome
+pnpm format   # biome, writing fixes
+```
+
+`seed/` is the benchmark fixture and carries deliberately failing tests, so neither the test run nor the linter covers it. `visualization.html` is not linted yet.
 
 ## What the agent sees
 
