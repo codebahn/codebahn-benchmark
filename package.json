@@ -7,11 +7,19 @@
   "scripts": {
     "parse": "tsx src/parse.ts",
     "compare": "tsx src/compare.ts",
-    "summary": "tsx src/summary.ts"
+    "summary": "tsx src/summary.ts",
+    "payload": "tsx src/payload.ts",
+    "test": "vitest run",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "score": "tsx src/scorecard.ts",
+    "fixture": "tsx agent/fixture.ts"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.13",
     "@types/node": "^26.2.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^5.0.0"
   }
 }

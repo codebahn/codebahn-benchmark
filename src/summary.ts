@@ -1,12 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { resolve, basename } from "node:path";
+import { resolve } from "node:path";
 
-const resultsDir = resolve(
-  import.meta.dirname ?? ".",
-  "..",
-  "agent",
-  "results",
-);
+const resultsDir = resolve(import.meta.dirname ?? ".", "..", "agent", "results");
 
 interface Parsed {
   sessionMs: number;
@@ -32,9 +27,7 @@ for (const dir of readdirSync(resultsDir)) {
     const parts = dir.match(/^(.+)-(codebahn|github)-(\d{8}-\d{6})$/);
     if (!parts) continue;
     runs.push({ task: parts[1], platform: parts[2], timestamp: parts[3], data });
-  } catch {
-    continue;
-  }
+  } catch {}
 }
 
 if (runs.length === 0) {
@@ -79,26 +72,26 @@ for (const task of tasks) {
     `  ${"".padEnd(20)} ${"Codebahn".padStart(10)} ${"GitHub".padStart(10)} ${"Ratio".padStart(8)}`,
   );
   console.log(
-    `  ${"MCP calls".padEnd(20)} ${String(cbAvgCalls).padStart(10)} ${String(ghAvgCalls).padStart(10)} ${(ghAvgCalls > cbAvgCalls ? (ghAvgCalls / cbAvgCalls).toFixed(1) + "x" : cbAvgCalls > ghAvgCalls ? "0." + Math.round((ghAvgCalls / cbAvgCalls) * 10) + "x" : "1.0x").padStart(8)}`,
+    `  ${"MCP calls".padEnd(20)} ${String(cbAvgCalls).padStart(10)} ${String(ghAvgCalls).padStart(10)} ${(ghAvgCalls > cbAvgCalls ? `${(ghAvgCalls / cbAvgCalls).toFixed(1)}x` : cbAvgCalls > ghAvgCalls ? `0.${Math.round((ghAvgCalls / cbAvgCalls) * 10)}x` : "1.0x").padStart(8)}`,
   );
   console.log(
-    `  ${"Platform wait".padEnd(20)} ${(cbAvgWait + "ms").padStart(10)} ${(ghAvgWait + "ms").padStart(10)} ${(ratio + "x").padStart(8)}`,
+    `  ${"Platform wait".padEnd(20)} ${(`${cbAvgWait}ms`).padStart(10)} ${(`${ghAvgWait}ms`).padStart(10)} ${(`${ratio}x`).padStart(8)}`,
   );
   console.log(
-    `  ${"Avg per call".padEnd(20)} ${(Math.round(cbAvgWait / (cbAvgCalls || 1)) + "ms").padStart(10)} ${(Math.round(ghAvgWait / (ghAvgCalls || 1)) + "ms").padStart(10)}`,
+    `  ${"Avg per call".padEnd(20)} ${(`${Math.round(cbAvgWait / (cbAvgCalls || 1))}ms`).padStart(10)} ${(`${Math.round(ghAvgWait / (ghAvgCalls || 1))}ms`).padStart(10)}`,
   );
 
   console.log("");
   console.log(`  ${"  Codebahn calls".padEnd(38)} ${"  GitHub calls".padEnd(38)}`);
-  console.log(`  ${"  " + "─".repeat(36)} ${"  " + "─".repeat(36)}`);
+  console.log(`  ${`  ${"─".repeat(36)}`} ${`  ${"─".repeat(36)}`}`);
   const cbCalls = cb[0].data.calls;
   const ghCalls = gh[0].data.calls;
   const maxLen = Math.max(cbCalls.length, ghCalls.length);
   for (let i = 0; i < maxLen; i++) {
     const cl = cbCalls[i];
     const gl = ghCalls[i];
-    const cStr = cl ? `  ${cl.tool.padEnd(26)} ${(cl.ms + "ms").padStart(7)}` : " ".repeat(38);
-    const gStr = gl ? `  ${gl.tool.padEnd(26)} ${(gl.ms + "ms").padStart(7)}` : "";
+    const cStr = cl ? `  ${cl.tool.padEnd(26)} ${(`${cl.ms}ms`).padStart(7)}` : " ".repeat(38);
+    const gStr = gl ? `  ${gl.tool.padEnd(26)} ${(`${gl.ms}ms`).padStart(7)}` : "";
     console.log(`  ${cStr} ${gStr}`);
   }
 }
@@ -106,9 +99,7 @@ for (const task of tasks) {
 if (taskCount > 1) {
   const overallRatio = totalCb > 0 ? (totalGh / totalCb).toFixed(1) : "-";
   console.log(`\n${"═".repeat(64)}`);
-  console.log(
-    `  Overall (${taskCount} tasks): Codebahn ${overallRatio}x faster`,
-  );
+  console.log(`  Overall (${taskCount} tasks): Codebahn ${overallRatio}x faster`);
   console.log(
     `  Total platform wait: ${(totalCb / 1000).toFixed(1)}s (CB) vs ${(totalGh / 1000).toFixed(1)}s (GH), ${((totalGh - totalCb) / 1000).toFixed(1)}s saved`,
   );
@@ -151,5 +142,5 @@ const output = {
 
 const outPath = resolve(resultsDir, "summary.json");
 const { writeFileSync } = await import("node:fs");
-writeFileSync(outPath, JSON.stringify(output, null, 2) + "\n");
+writeFileSync(outPath, `${JSON.stringify(output, null, 2)}\n`);
 console.log(`\n  Summary: ${outPath}`);

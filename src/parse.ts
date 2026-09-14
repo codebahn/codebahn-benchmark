@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { resolve } from "node:path";
+import { sumUsage } from "./usage.js";
 
 const file = process.argv[2];
 if (!file) {
@@ -18,7 +19,9 @@ interface ToolCall {
 interface Event {
   type: string;
   timestamp?: string;
+  total_cost_usd?: number;
   message?: {
+    usage?: Record<string, unknown>;
     content?: Array<{
       type: string;
       id?: string;
@@ -90,33 +93,39 @@ const totalOtherMs = otherCalls.reduce((s, c) => s + (c.durationMs ?? 0), 0);
 const totalSessionMs = sessionEnd - sessionStart;
 const thinkingMs = totalSessionMs - totalMcpMs - totalOtherMs;
 
+const usage = sumUsage(events);
+
 console.log("Agent Benchmark: Transcript Analysis");
 console.log("─".repeat(60));
 console.log(`  Session duration:    ${(totalSessionMs / 1000).toFixed(1)}s`);
-console.log(`  MCP calls:           ${mcpCalls.length} (${(totalMcpMs / 1000).toFixed(1)}s waiting)`);
-console.log(`  Other tool calls:    ${otherCalls.length} (${(totalOtherMs / 1000).toFixed(1)}s)`);
 console.log(
-  `  Model thinking:      ${(thinkingMs / 1000).toFixed(1)}s`,
+  `  MCP calls:           ${mcpCalls.length} (${(totalMcpMs / 1000).toFixed(1)}s waiting)`,
 );
+console.log(`  Other tool calls:    ${otherCalls.length} (${(totalOtherMs / 1000).toFixed(1)}s)`);
+console.log(`  Model thinking:      ${(thinkingMs / 1000).toFixed(1)}s`);
+console.log("");
+console.log(`  Peak context:        ${usage.peakContextTokens.toLocaleString()} tokens`);
+console.log(
+  `  Input tokens:        ${usage.inputTokens.toLocaleString()} (+${usage.cacheReadTokens.toLocaleString()} cached, ${usage.cacheCreationTokens.toLocaleString()} written)`,
+);
+console.log(`  Output tokens:       ${usage.outputTokens.toLocaleString()}`);
+if (usage.totalCostUsd !== null) {
+  console.log(`  Run cost:            $${usage.totalCostUsd.toFixed(4)}`);
+}
 console.log("");
 
 if (mcpCalls.length > 0) {
-  console.log(
-    `  ${"MCP Tool Call".padEnd(42)} ${"Duration".padStart(8)}`,
-  );
+  console.log(`  ${"MCP Tool Call".padEnd(42)} ${"Duration".padStart(8)}`);
   console.log(`  ${"─".repeat(42)} ${"─".repeat(8)}`);
 
   for (const c of mcpCalls) {
     const shortName = c.name.substring(c.name.lastIndexOf("__") + 2);
-    const dur =
-      c.durationMs !== null ? `${c.durationMs}ms` : "pending";
+    const dur = c.durationMs !== null ? `${c.durationMs}ms` : "pending";
     console.log(`  ${shortName.padEnd(42)} ${dur.padStart(8)}`);
   }
 
   console.log(`  ${"─".repeat(42)} ${"─".repeat(8)}`);
-  console.log(
-    `  ${"Total platform wait".padEnd(42)} ${`${totalMcpMs}ms`.padStart(8)}`,
-  );
+  console.log(`  ${"Total platform wait".padEnd(42)} ${`${totalMcpMs}ms`.padStart(8)}`);
 }
 
 // Group by tool for summary
@@ -124,7 +133,7 @@ const byTool = new Map<string, number[]>();
 for (const c of mcpCalls) {
   const short = c.name.substring(c.name.lastIndexOf("__") + 2);
   if (!byTool.has(short)) byTool.set(short, []);
-  if (c.durationMs !== null) byTool.get(short)!.push(c.durationMs);
+  if (c.durationMs !== null) byTool.get(short)?.push(c.durationMs);
 }
 
 if (byTool.size > 0) {
@@ -132,13 +141,9 @@ if (byTool.size > 0) {
   console.log(
     `  ${"Tool".padEnd(30)} ${"Calls".padStart(5)} ${"Avg".padStart(7)} ${"Total".padStart(8)}`,
   );
-  console.log(
-    `  ${"─".repeat(30)} ${"─".repeat(5)} ${"─".repeat(7)} ${"─".repeat(8)}`,
-  );
+  console.log(`  ${"─".repeat(30)} ${"─".repeat(5)} ${"─".repeat(7)} ${"─".repeat(8)}`);
   for (const [name, durations] of byTool) {
-    const avg = Math.round(
-      durations.reduce((a, b) => a + b, 0) / durations.length,
-    );
+    const avg = Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);
     const total = durations.reduce((a, b) => a + b, 0);
     console.log(
       `  ${name.padEnd(30)} ${String(durations.length).padStart(5)} ${`${avg}ms`.padStart(7)} ${`${total}ms`.padStart(8)}`,
@@ -153,6 +158,7 @@ const output = {
   mcpCalls: mcpCalls.length,
   mcpWaitMs: totalMcpMs,
   thinkingMs,
+  usage,
   calls: mcpCalls.map((c) => ({
     tool: c.name.substring(c.name.lastIndexOf("__") + 2),
     fullName: c.name,
@@ -163,13 +169,11 @@ const output = {
       name,
       {
         count: durations.length,
-        avgMs: Math.round(
-          durations.reduce((a, b) => a + b, 0) / durations.length,
-        ),
+        avgMs: Math.round(durations.reduce((a, b) => a + b, 0) / durations.length),
         totalMs: durations.reduce((a, b) => a + b, 0),
       },
     ]),
   ),
 };
-writeFileSync(outPath, JSON.stringify(output, null, 2) + "\n");
+writeFileSync(outPath, `${JSON.stringify(output, null, 2)}\n`);
 console.log(`\n  Parsed: ${outPath}`);
