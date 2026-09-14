@@ -1,9 +1,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { parseLabels } from "./metrics.js";
 
-const [, , cbFile, ghFile] = process.argv;
+const argv = process.argv.slice(2);
+const [leftLabel, rightLabel] = parseLabels(argv);
+const [cbFile, ghFile] = argv.filter((a) => !a.startsWith("--") && a.endsWith(".json"));
 if (!cbFile || !ghFile) {
-  console.error("Usage: tsx src/compare.ts <codebahn-parsed.json> <github-parsed.json>");
+  console.error("Usage: tsx src/compare.ts <a-parsed.json> <b-parsed.json> [--labels left,right]");
   process.exit(1);
 }
 
@@ -28,13 +31,13 @@ interface Parsed {
 const cb: Parsed = JSON.parse(readFileSync(resolve(cbFile), "utf-8"));
 const gh: Parsed = JSON.parse(readFileSync(resolve(ghFile), "utf-8"));
 
-console.log("Codebahn vs GitHub: Agent Experience Comparison");
+console.log(`${leftLabel} vs ${rightLabel}: Agent Experience Comparison`);
 console.log("═".repeat(60));
 
 console.log("\n  Overview");
 console.log(`  ${"─".repeat(58)}`);
 console.log(
-  `  ${"".padEnd(30)} ${"Codebahn".padStart(10)} ${"GitHub".padStart(10)} ${"Ratio".padStart(8)}`,
+  `  ${"".padEnd(30)} ${leftLabel.padStart(10)} ${rightLabel.padStart(10)} ${"Ratio".padStart(8)}`,
 );
 console.log(`  ${"".padEnd(30)} ${"─".repeat(10)} ${"─".repeat(10)} ${"─".repeat(8)}`);
 
@@ -77,7 +80,7 @@ if (allTools.size > 0) {
   console.log("\n  Per-tool average latency");
   console.log(`  ${"─".repeat(58)}`);
   console.log(
-    `  ${"Tool".padEnd(30)} ${"CB avg".padStart(10)} ${"GH avg".padStart(10)} ${"Ratio".padStart(8)}`,
+    `  ${"Tool".padEnd(30)} ${`${leftLabel} avg`.padStart(10)} ${`${rightLabel} avg`.padStart(10)} ${"Ratio".padStart(8)}`,
   );
   console.log(`  ${"".padEnd(30)} ${"─".repeat(10)} ${"─".repeat(10)} ${"─".repeat(8)}`);
 

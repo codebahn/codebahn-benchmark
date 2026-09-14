@@ -110,6 +110,27 @@ tools are supposed to move.
 Cost matters here: each arm is a real agent run. Start with one run per arm, and
 only repeat for error bars once the numbers look worth it.
 
+### What the first run showed, and the limit of this design
+
+Both arms scored 4/4, history defects included. The `before` arm reached the
+history without any of the hidden tools:
+
+```
+mcp__codebahn__list_repo_commits sha=bench/review-fixture
+mcp__codebahn__get_file_content  ref=75b0c24
+mcp__codebahn__get_file_content  ref=0cea1d1
+```
+
+`list_repo_commits` takes a `sha` and `get_file_content` takes a `ref`, and
+together they reconstruct a per-commit review. Both tools predate the change
+under test, so hiding the three new ones isolates nothing: they are a shortcut,
+not a capability. Recall cannot separate these arms, and no honest arm definition
+would, because the history was always reachable.
+
+What is left to measure is efficiency, and one run each is not enough to claim
+it. Treat the arm comparison as a cost harness, not a capability test, and read
+the payload benchmark for the numbers that hold up.
+
 ## Development
 
 ```bash

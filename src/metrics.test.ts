@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { estimateTokens, extractToolText, median, ratio, readIntFlag } from "./metrics.js";
+import {
+  estimateTokens,
+  extractToolText,
+  median,
+  parseLabels,
+  ratio,
+  readIntFlag,
+} from "./metrics.js";
 
 describe("median", () => {
   it("takes the middle of an odd sample", () => {
@@ -101,5 +108,24 @@ describe("readIntFlag", () => {
 
   it("falls back on a count that would measure nothing", () => {
     expect(readIntFlag(["--iterations", "0"], "--iterations", 5)).toBe(5);
+  });
+});
+
+describe("parseLabels", () => {
+  it("reads a comma separated pair", () => {
+    expect(parseLabels(["--labels", "after,before"])).toEqual(["after", "before"]);
+  });
+
+  it("trims the parts", () => {
+    expect(parseLabels(["--labels", "after , before"])).toEqual(["after", "before"]);
+  });
+
+  it("keeps the platform defaults when no labels are given", () => {
+    expect(parseLabels(["a.json", "b.json"])).toEqual(["Codebahn", "GitHub"]);
+  });
+
+  it("falls back when the pair is malformed", () => {
+    expect(parseLabels(["--labels", "onlyone"])).toEqual(["Codebahn", "GitHub"]);
+    expect(parseLabels(["--labels"])).toEqual(["Codebahn", "GitHub"]);
   });
 });

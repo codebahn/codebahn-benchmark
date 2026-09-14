@@ -24,6 +24,17 @@ export function readIntFlag(args: string[], flag: string, fallback: number): num
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+/** Column headings for a comparison, defaulting to the original platform pair. */
+export function parseLabels(args: string[]): [string, string] {
+  const at = args.indexOf("--labels");
+  if (at === -1) return ["Codebahn", "GitHub"];
+  const parts = (args[at + 1] ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts.length === 2 ? [parts[0], parts[1]] : ["Codebahn", "GitHub"];
+}
+
 interface JsonRpcResponse {
   error?: { code?: number; message?: string };
   result?: { isError?: boolean; content?: Array<{ type?: string; text?: string }> };
