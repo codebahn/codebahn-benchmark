@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# CI parity check: green here means green on the pull request.
+#
+# Mirrors the `check` job of .github/workflows/ci.yml: Biome lint, then vitest. Dependencies
+# are assumed installed (`pnpm install --frozen-lockfile`).
+#
+# usage: .claude/check [--quick]
+#   --quick  same as the full check (it takes a few seconds).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+pnpm lint && pnpm test

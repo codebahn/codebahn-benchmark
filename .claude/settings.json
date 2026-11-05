@@ -1,0 +1,12 @@
+{
+  "autoMemoryDirectory": "~/code/agent-knowledge/inbox/codebahn-benchmark",
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./.envrc)",
+      "Read(./agent/mcp-codebahn.json)",
+      "Read(./agent/mcp-github.json)"
+    ]
+  }
+}
